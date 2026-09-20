@@ -1,300 +1,63 @@
-# Nomi
+# BlinkZenly — клон Blink/Zenly на Java (Android)
 
-> **Know where your people are.**
+Каркас мобильного приложения, закрывающий все требуемые пункты:
 
-**Nomi** — клиент-серверное мобильное приложение для обмена геопозицией между друзьями в реальном времени.
+| № | Функция | Где реализовано |
+|---|---|---|
+| 1 | Авторизация | `auth/LoginActivity`, `auth/RegisterActivity` (Firebase Auth) |
+| 2 | Гео | `map/LocationService` + `map/MapActivity` (Realtime Database) |
+| 3 | Реакции | `MapActivity.showReactionPicker/sendReaction`, `model/ReactionModel` |
+| 4 | Метки и фотки | `marks/AddMarkActivity`, `model/MarkModel` (Firebase Storage) |
+| 5 | Статусы | `status/StatusActivity`, поля `User.statusText/statusEmoji` |
+| 6 | Чаты + кружочки | `chat/ChatListActivity`, `chat/ChatActivity`, `chat/CircleRecordActivity`, `chat/CircleVideoView`, `chat/CircleCameraPreview` |
+| 7 | Уведомления | `notifications/MyFirebaseMessagingService`, `notifications/NotificationHelper` |
+| 8 | Маршруты (встреча) | `route/RouteActivity`, `model/RouteMeeting` |
 
-Приложение позволяет видеть местоположение друзей на карте, создавать группы, делиться своим статусом и использовать географические уведомления. Проект разработан как компактная социальная система с realtime-взаимодействием между несколькими клиентами.
+## Архитектура
+- **Backend = Firebase** (без своего сервера): Auth, Firestore (профили, реакции, метки, чаты, встречи), Realtime Database (live-координаты — низкая задержка), Storage (фото и видео-кружочки), Cloud Messaging (push).
+- **Карта** — Google Maps SDK for Android + Directions API для построения маршрута к точке встречи.
+- **Кружочки** — запись через CameraX (`VideoCapture`), круглая маска через `Canvas.clipPath` и на превью (`CircleCameraPreview`), и на воспроизведении (`CircleVideoView`).
 
----
+## Как запустить
 
-## ✨ Возможности
+1. Откройте папку `BlinkZenlyClone` в Android Studio (Giraffe/Koala и новее).
+2. Создайте проект в [Firebase Console](https://console.firebase.google.com/), добавьте Android-приложение с `applicationId = com.example.blinkzenly`, скачайте `google-services.json` и положите в `app/`.
+3. В Firebase Console включите:
+   - **Authentication** → Email/Password.
+   - **Firestore Database** (в тестовом режиме на старте).
+   - **Realtime Database**.
+   - **Storage**.
+   - **Cloud Messaging**.
+4. Получите ключ **Google Maps SDK + Directions API** в [Google Cloud Console](https://console.cloud.google.com/) и вставьте его вместо `ВАШ_GOOGLE_MAPS_API_KEY`:
+   - `AndroidManifest.xml` (meta-data `com.google.android.geo.API_KEY`)
+   - `route/RouteActivity.java` (константа `DIRECTIONS_API_KEY`)
+5. Соберите и запустите (`Run ▶`). При первом запуске приложение попросит доступ к геолокации.
+6. Иконку приложения (`@mipmap/ic_launcher`) сгенерируйте через **Image Asset Studio** (ПКМ на `res` → New → Image Asset) — в макете сейчас она не включена намеренно, чтобы вы использовали свой дизайн.
 
-* 📍 **Live Location** — отображение текущего местоположения друзей в реальном времени.
-* 👥 **Друзья и группы** — добавление друзей и объединение их в приватные группы.
-* 🟢 **Статусы присутствия** — отображение текущего состояния пользователя.
-* 🏠 **Избранные места** — сохранение дома, университета, работы и других мест.
-* 🕐 **История перемещений** — просмотр маршрута пользователя за ограниченный период.
-* 🔔 **Геоуведомления** — уведомления при приближении друга к выбранному месту.
-* 🔐 **Приватность** — управление точностью и доступностью геопозиции.
-* 💬 **Быстрые статусы** — возможность сообщить друзьям, где ты и что делаешь.
-* 🔥 **Friend Pulse** — определение ближайших друзей.
+## Push-уведомления (п.7) — доотправка через Cloud Function
 
----
+Клиент только **принимает** push (`MyFirebaseMessagingService`) и хранит `fcmToken` в `users/{uid}`.
+Чтобы реакции/сообщения/приглашения реально долетали как push, разверните лёгкую Cloud Function-триггер (Node.js, отдельно от Android-кода), которая слушает:
+- создание документа в `reactions/` → шлёт push получателю (`toUid`) через Admin SDK `messaging().send()`,
+- создание сообщения в `chats/{chatId}/messages/` → шлёт push второму участнику чата,
+- создание документа в `meetings/` → шлёт push участникам `participants`.
 
-## 🏗 Архитектура
+Это стандартная связка "Firestore trigger → Admin SDK FCM send", отдельный сервис, не входящий в APK.
 
-Проект построен по клиент-серверной архитектуре.
+## Структура Firestore/Realtime DB
 
-### Клиент
-
-Мобильное приложение отвечает за:
-
-* пользовательский интерфейс;
-* авторизацию;
-* получение геопозиции;
-* отображение карты;
-* работу с разрешениями устройства;
-* отправку координат;
-* получение realtime-обновлений;
-* локальное хранение данных.
-
-### Сервер
-
-Backend отвечает за:
-
-* регистрацию и авторизацию пользователей;
-* управление друзьями и группами;
-* обработку геопозиции;
-* realtime-синхронизацию;
-* хранение истории перемещений;
-* расчёт расстояния между пользователями;
-* геозоны и уведомления;
-* настройки приватности.
-
----
-
-## 🛠 Технологический стек
-
-### Mobile
-
-* **Flutter**
-* **Dart**
-* Google Maps / OpenStreetMap
-* WebSocket
-* REST API
-* Geolocation API
-
-### Backend
-
-* **Java**
-* **Spring Boot**
-* Spring Security
-* JWT
-* WebSocket
-* REST API
-
-### Database
-
-* **PostgreSQL**
-* **Redis**
-
-### Infrastructure
-
-* Docker
-* Docker Compose
-* Git / GitHub
-
----
-
-## 🔄 Взаимодействие клиента и сервера
-
-Основное взаимодействие осуществляется двумя способами.
-
-### REST API
-
-Используется для операций, которые не требуют постоянного соединения:
-
-```text
-POST   /api/auth/register
-POST   /api/auth/login
-
-GET    /api/users/me
-GET    /api/friends
-POST   /api/friends
-DELETE /api/friends/{id}
-
-GET    /api/groups
-POST   /api/groups
-
-GET    /api/locations/history
-POST   /api/places
-
-GET    /api/notifications
+```
+users/{uid}            -> User (name, avatarUrl, statusText, statusEmoji, lastLat/lastLng, fcmToken)
+locations/{uid}         -> LocationPoint (Realtime DB, live-координаты)
+reactions/{autoId}      -> ReactionModel (fromUid, toUid, emoji)
+marks/{autoId}          -> MarkModel (title, photoUrl, lat, lng)
+chats/{chatId}          -> { participants: [uid1, uid2] }
+chats/{chatId}/messages/{autoId} -> ChatMessage (type=TEXT|CIRCLE)
+meetings/{autoId}       -> RouteMeeting (destLat/destLng, participants, meetAt)
 ```
 
-### WebSocket
-
-Используется для realtime-обновления геопозиции.
-
-```text
-Client A
-   │
-   │ location update
-   ▼
-WebSocket Server
-   │
-   ├──────────────► Client B
-   │
-   ├──────────────► Client C
-   │
-   └──────────────► Client D
-```
-
-Благодаря этому пользователям не требуется постоянно отправлять HTTP-запросы для получения новых координат.
-
----
-
-## 📍 Работа с геопозицией
-
-Клиент периодически получает координаты пользователя:
-
-```json
-{
-  "latitude": 55.7558,
-  "longitude": 37.6173,
-  "timestamp": "2026-09-07T12:15:32Z"
-}
-```
-
-После этого координаты передаются серверу.
-
-Сервер:
-
-1. проверяет пользователя;
-2. проверяет настройки приватности;
-3. сохраняет актуальную позицию;
-4. обновляет состояние пользователя;
-5. передаёт новую позицию разрешённым друзьям;
-6. проверяет активные геозоны.
-
----
-
-## 🔐 Приватность
-
-Геопозиция является чувствительными данными, поэтому пользователь самостоятельно определяет, кому и насколько точно она доступна.
-
-Доступны следующие режимы:
-
-| Режим           | Описание                    |
-| --------------- | --------------------------- |
-| **Exact**       | Точная геопозиция           |
-| **Approximate** | Примерное местоположение    |
-| **Frozen**      | Последняя известная позиция |
-| **Hidden**      | Геопозиция скрыта           |
-
-Настройки могут применяться отдельно к различным группам друзей.
-
----
-
-## 🗄 Структура данных
-
-Основные сущности системы:
-
-User
-
-Friendship
-
-Group
-
-GroupMember
-
-Location
-
-Place
-
-GeoNotification
-
----
-
-## 👥 Командная разработка
-
-Проект разрабатывается командой из двух человек.
-
-### Backend Developer
-
-Отвечает за:
-
-* Spring Boot;
-* REST API;
-* WebSocket;
-* PostgreSQL;
-* Redis;
-* JWT;
-* бизнес-логику;
-* геозоны;
-* Docker.
-
-### Mobile Developer
-
-Отвечает за:
-* UI/UX;
-* карту;
-* получение геопозиции;
-* авторизацию;
-* WebSocket-клиент;
-* отображение друзей;
-* локальное хранение.
-
-Интеграция клиентской и серверной частей выполняется совместно.
-
----
-
-## 🚀 Запуск проекта
-
-### 1. Клонирование
-
-```bash
-git clone https://github.com/dariythe6th/nomi.git
-cd nomi
-```
-
-### 2. Запуск инфраструктуры
-
-```bash
-docker compose up -d
-```
-
-### 3. Запуск Backend
-
-```bash
-./mvnw spring-boot:run
-```
-
-Backend будет доступен по адресу:
-
-```text
-http://localhost:8080
-```
-
-### 4. Запуск Mobile Client
-
-```bash
-flutter pub get
-flutter run
-```
-
----
-
-## 📂 Структура проекта
-
-
----
-
-## 🎯 Цель проекта
-
-Основная цель Nomi — разработка компактной клиент-серверной системы, демонстрирующей работу мобильного клиента с серверной инфраструктурой в режиме реального времени.
-
-Проект объединяет:
-
-* мобильную разработку;
-* REST API;
-* WebSocket;
-* аутентификацию;
-* работу с базами данных;
-* обработку геоданных;
-* realtime-синхронизацию;
-* систему приватности;
-* географические события.
-
----
-
-## 📌 Статус
-
-**In development**
-
-Проект находится на стадии разработки.
-
----
-
-## Nexium Team
+## Что доработать под свою защиту
+- Экран выбора друга при создании чата/встречи (сейчас демо-заглушка с фиктивным uid).
+- Правила безопасности Firestore/Storage/Realtime DB (`security rules`) — сейчас предполагается тестовый режим.
+- Список друзей/заявок в друзья, если требуется в презентации.
+- Полноценная иконка приложения и брендинг.
