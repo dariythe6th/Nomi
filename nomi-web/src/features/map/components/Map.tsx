@@ -1,22 +1,20 @@
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
-import { Icon } from 'leaflet';
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polyline,
+  useMap,
+} from 'react-leaflet';
+import { useEffect, useRef } from 'react';
 import { useTheme } from '../../../shared/theme/useTheme';
+import { useLocationTracker } from '../../location/useLocationTracker';
+import { createAvatarIcon } from '../lib/avatarIcon'; // ← ЭТО ДОБАВЬ
 
-/* Светлые тайлы — OpenStreetMap */
 const LIGHT_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const LIGHT_ATTR = '© OpenStreetMap contributors';
-
-/* Тёмные тайлы — CARTO Dark Matter (бесплатно, без ключа) */
 const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 const DARK_ATTR = '© OpenStreetMap contributors © CARTO';
-
-const defaultIcon = new Icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-});
 
 interface MapProps {
   routePoints?: [number, number][];
@@ -24,11 +22,11 @@ interface MapProps {
 
 export function Map({ routePoints }: MapProps) {
   const { theme } = useTheme();
-  const center: [number, number] = [55.7558, 37.6173];
+  // ← ЭТО ЗАМЕНИ: добавили userName
+  const { connected, others, myCoords, userName } = useLocationTracker();
 
   const isDark = theme === 'dark';
-  const tileUrl = isDark ? DARK_TILES : LIGHT_TILES;
-  const attribution = isDark ? DARK_ATTR : LIGHT_ATTR;
+  const center: [number, number] = [55.7558, 37.6173];
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -39,21 +37,95 @@ export function Map({ routePoints }: MapProps) {
         attributionControl={false}
         zoomControl={false}
       >
-        <TileLayer key={theme} url={tileUrl} attribution={attribution} />
+        <TileLayer
+          key={theme}
+          url={isDark ? DARK_TILES : LIGHT_TILES}
+          attribution={isDark ? DARK_ATTR : LIGHT_ATTR}
+        />
 
-        <Marker position={center} icon={defaultIcon}>
-          <Popup>Ты здесь</Popup>
-        </Marker>
+        <CenterOnMe coords={myCoords ?? null} />
+
+        {/* ← ЭТО ЗАМЕНИ: свой маркер теперь — круглая аватарка */}
+        {myCoords && (
+          <Marker
+            position={[myCoords.latitude, myCoords.longitude]}
+            icon={createAvatarIcon({
+              name: userName,
+              avatarUrl: null,
+              online: true,
+              theme,
+            })}
+          >
+            <Popup>
+              <strong>{userName}</strong>
+              <br />
+              Это ты
+            </Popup>
+          </Marker>
+        )}
+
+        {/* Маркеры других пользователей — тоже кружки */}
+        {others.map(
+          (user) =>
+            user.lat !== null &&
+            user.lng !== null && (
+              <Marker
+                key={user.id}
+                position={[user.lat, user.lng]}
+                icon={createAvatarIcon({
+                  name: user.name,
+                  avatarUrl: null,
+                  online: Date.now() - user.lastSeen < 60_000,
+                  theme,
+                })}
+              >
+                <Popup>
+                  <strong>{user.name}</strong>
+                  <br />
+                  Точность: ±{Math.round(user.accuracy ?? 0)} м
+                </Popup>
+              </Marker>
+            ),
+        )}
 
         {routePoints && routePoints.length > 1 && (
           <Polyline positions={routePoints} color="#0ABAB5" weight={5} />
         )}
 
-        {/* Кастомный zoom control — справа, напротив меню */}
         <ZoomControls />
       </MapContainer>
 
-      {/* Атрибуция — в правом нижнем углу */}
+      {/* Индикатор состояния подключения */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 20,
+          right: 20,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '8px 14px',
+          background: 'var(--bg-header)',
+          color: 'var(--text-header)',
+          borderRadius: 12,
+          fontSize: 13,
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
+          zIndex: 1100,
+        }}
+      >
+        <span
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: '50%',
+            background: connected ? '#0ABAB5' : '#ff4444',
+            boxShadow: connected ? '0 0 8px #0ABAB5' : 'none',
+          }}
+        />
+        {connected ? `В сети · ${others.length + 1} чел.` : 'Не подключено'}
+      </div>
+
+      {/* Атрибуция */}
       <div
         style={{
           position: 'absolute',
@@ -68,13 +140,30 @@ export function Map({ routePoints }: MapProps) {
           pointerEvents: 'none',
         }}
       >
-        {attribution} | Leaflet
+        {(isDark ? DARK_ATTR : LIGHT_ATTR)} | Leaflet
       </div>
     </div>
   );
 }
 
-/* ===== Кастомные кнопки зума ===== */
+/* ===== Вспомогательные компоненты ===== */
+
+function CenterOnMe({
+  coords,
+}: {
+  coords: { latitude: number; longitude: number } | null;
+}) {
+  const map = useMap();
+  const done = useRef(false);
+
+  useEffect(() => {
+    if (!coords || done.current) return;
+    map.setView([coords.latitude, coords.longitude], 15);
+    done.current = true;
+  }, [coords, map]);
+
+  return null;
+}
 
 function ZoomControls() {
   const map = useMap();
@@ -115,17 +204,14 @@ function ZoomControls() {
       <button
         style={btnStyle}
         onClick={() => map.zoomIn()}
-        title="Приблизить"
         onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--accent)')}
         onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-header)')}
       >
         +
       </button>
-
       <button
         style={btnStyle}
         onClick={() => map.zoomOut()}
-        title="Отдалить"
         onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--accent)')}
         onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-header)')}
       >

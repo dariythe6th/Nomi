@@ -120,3 +120,53 @@ input {
      6px  6px 0 #c94b7b,
      8px  8px 12px rgba(0, 0, 0, 0.35);
 }
+
+
+
+/* ===== Круглый маркер с аватаркой ===== */
+
+.nomi-avatar-icon {
+  background: transparent;
+  border: none;
+}
+
+.nomi-avatar-marker {
+  position: relative;
+  width: 52px;
+  height: 52px;
+}
+
+.nomi-avatar-circle {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 0 2px var(--accent), 0 4px 12px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0;
+  overflow: hidden;
+  user-select: none;
+}
+
+[data-theme='dark'] .nomi-avatar-circle {
+  border-color: #000000;
+  box-shadow: 0 0 0 2px var(--accent), 0 4px 16px rgba(0, 230, 208, 0.5);
+}
+
+/* Белый кружок «онлайн» в правом нижнем углу */
+.nomi-avatar-online {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid var(--accent);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}

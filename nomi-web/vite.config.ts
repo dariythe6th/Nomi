@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: true, // ← доступ с других устройств в сети
     proxy: {
       '/motis': {
         target: 'https://api.transitous.org',
