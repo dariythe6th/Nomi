@@ -1,0 +1,122 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+input {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  background: var(--input-bg);
+  color: var(--text);
+  transition: border 0.15s;
+}
+
+input:focus {
+  border-color: var(--accent);
+}
+
+/* ===== СВЕТЛАЯ ТЕМА (по умолчанию) ===== */
+:root,
+[data-theme='light'] {
+  --bg: #fafafa;
+  --bg-panel: #ffffff;
+  --bg-header: #1a1a2e;
+  --bg-hover: #f0f0f0;
+  --input-bg: #ffffff;
+
+  --text: #1a1a2e;
+  --text-muted: #888888;
+  --text-header: #ffffff;
+  --text-header-muted: #a0a0b0;
+
+  --accent: #0ABAB5;              /* цвет тиффани */
+  --accent-hover: #08a5a0;
+  --accent-soft: rgba(10, 186, 181, 0.15);
+  --accent-glow: rgba(10, 186, 181, 0.35);
+
+  --border: #e0e0e0;
+  --border-strong: #cccccc;
+}
+
+/* ===== ТЁМНАЯ ТЕМА ===== */
+[data-theme='dark'] {
+  --bg: #000000;
+  --bg-panel: #0d0d0d;
+  --bg-header: #000000;
+  --bg-hover: #161616;
+  --input-bg: #111111;
+
+  --text: #ffffff;
+  --text-muted: #888888;
+  --text-header: #ffffff;
+  --text-header-muted: #888888;
+
+  --accent: #00E5D0;              /* бирюза, ярче для контраста */
+  --accent-hover: #00c8b6;
+  --accent-soft: rgba(0, 229, 208, 0.18);
+  --accent-glow: rgba(0, 229, 208, 0.45);
+
+  --border: #222222;
+  --border-strong: #333333;
+}
+
+/* Плавный переход между темами */
+body,
+header,
+aside,
+main,
+div,
+button,
+a,
+input {
+  transition: background-color 0.2s ease, color 0.2s ease,
+              border-color 0.2s ease;
+}
+
+/* Мультяшный 3D-логотип */
+.nomi-logo {
+  font-family: 'Arial Black', 'Impact', sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: #ffd93d;
+  line-height: 1;
+  user-select: none;
+  text-shadow:
+    -2px -2px 0 var(--bg-header),
+     0   -2px 0 var(--bg-header),
+     2px -2px 0 var(--bg-header),
+    -2px  0   0 var(--bg-header),
+     2px  0   0 var(--bg-header),
+    -2px  2px 0 var(--bg-header),
+     0    2px 0 var(--bg-header),
+     2px  2px 0 var(--bg-header),
+     4px  4px 0 #ff6b9d,
+     6px  6px 0 #c94b7b,
+     8px  8px 12px rgba(0, 0, 0, 0.35);
+}
