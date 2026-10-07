@@ -65,24 +65,25 @@ input:focus {
 
 /* ===== ТЁМНАЯ ТЕМА ===== */
 [data-theme='dark'] {
-  --bg: #000000;
-  --bg-panel: #0d0d0d;
-  --bg-header: #000000;
-  --bg-hover: #161616;
-  --input-bg: #111111;
+  /* Фон и панели — градации серого, чтобы блоки различались */
+  --bg: #0d0d0d;              /* основной фон — почти чёрный */
+  --bg-panel: #1c1c1c;        /* панели и блоки — заметно светлее */
+  --bg-header: #000000;       /* шапка — чистый чёрный */
+  --bg-hover: #262626;
+  --input-bg: #1c1c1c;
 
-  --text: #ffffff;
-  --text-muted: #888888;
+  --text: #ffffff;            /* основной текст — белый */
+  --text-muted: #8ba8b8;      /* вторичный текст — светлый голубовато-серый */
   --text-header: #ffffff;
   --text-header-muted: #888888;
 
-  --accent: #00E5D0;              /* бирюза, ярче для контраста */
+  --accent: #00E5D0;          /* тиффани-бирюза */
   --accent-hover: #00c8b6;
   --accent-soft: rgba(0, 229, 208, 0.18);
-  --accent-glow: rgba(0, 229, 208, 0.45);
+  --accent-glow: rgba(0, 229, 208, 0.5);
 
-  --border: #222222;
-  --border-strong: #333333;
+  --border: #2a2a2a;
+  --border-strong: #3a3a3a;
 }
 
 /* Плавный переход между темами */
@@ -99,7 +100,7 @@ input {
 }
 
 /* Мультяшный 3D-логотип */
-.nomi-logo {
+/* .nomi-logo {
   font-family: 'Arial Black', 'Impact', sans-serif;
   font-size: 28px;
   font-weight: 900;
@@ -119,54 +120,57 @@ input {
      4px  4px 0 #ff6b9d,
      6px  6px 0 #c94b7b,
      8px  8px 12px rgba(0, 0, 0, 0.35);
+} */
+
+
+
+/* ===== Маркер-капля с аватаркой ===== */
+
+.nomi-pin-icon {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  width: 48px !important;
+  height: 60px !important;
+}
+
+.nomi-pin-svg {
+  display: block !important;
+  width: 48px !important;
+  height: 60px !important;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+}
+
+[data-theme='dark'] .nomi-pin-svg {
+  filter: drop-shadow(0 4px 12px rgba(0, 230, 208, 0.5));
 }
 
 
 
-/* ===== Круглый маркер с аватаркой ===== */
+/* ===== Заголовки ===== */
 
-.nomi-avatar-icon {
-  background: transparent;
-  border: none;
+/* В светлой теме — обычный тёмный текст */
+h1, h2, h3 {
+  color: var(--text);
 }
 
-.nomi-avatar-marker {
-  position: relative;
-  width: 52px;
-  height: 52px;
+/* В тёмной теме — светящийся тиффани */
+[data-theme='dark'] h1,
+[data-theme='dark'] h2,
+[data-theme='dark'] h3 {
+  color: var(--accent);
+  text-shadow:
+    0 0 12px var(--accent-glow),
+    0 0 24px rgba(0, 229, 208, 0.25);
 }
 
-.nomi-avatar-circle {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: var(--accent);
-  border: 3px solid #ffffff;
-  box-shadow: 0 0 0 2px var(--accent), 0 4px 12px rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 20px;
-  letter-spacing: 0;
-  overflow: hidden;
-  user-select: none;
+/* Обычный текст в тёмной теме — светлый с голубоватым оттенком */
+[data-theme='dark'] p,
+[data-theme='dark'] span,
+[data-theme='dark'] label {
+  color: var(--text);
 }
 
-[data-theme='dark'] .nomi-avatar-circle {
-  border-color: #000000;
-  box-shadow: 0 0 0 2px var(--accent), 0 4px 16px rgba(0, 230, 208, 0.5);
-}
-
-/* Белый кружок «онлайн» в правом нижнем углу */
-.nomi-avatar-online {
-  position: absolute;
-  right: -2px;
-  bottom: -2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 3px solid var(--accent);
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
-}
+[data-theme='dark'] p {
+  color: var(--text-muted);
+} 

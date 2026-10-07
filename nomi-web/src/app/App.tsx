@@ -1,11 +1,14 @@
 import { RouterProvider } from 'react-router-dom';
 import { ThemeProvider } from '../shared/theme/ThemeProvider';
+import { LocationProvider } from '../features/location/LocationProvider';
 import { router } from './router';
 
 export function App() {
   return (
     <ThemeProvider>
-      <RouterProvider router={router} />
+      <LocationProvider>
+        <RouterProvider router={router} />
+      </LocationProvider>
     </ThemeProvider>
   );
 }
