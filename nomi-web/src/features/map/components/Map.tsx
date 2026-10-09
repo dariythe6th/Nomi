@@ -7,26 +7,53 @@ import {
   useMap,
 } from 'react-leaflet';
 import L from 'leaflet';
+import { useSearchParams } from 'react-router-dom';
 import { useLocationTracker } from '../../location/useLocationTracker';
+import { useMyProfile } from '../../profile/useMyProfile';
+import { useFriendIds } from '../../friends/useFriendIds';
+import { useRoutingTo } from '../../routing/useRoutingTo';
 import { createAvatarIcon } from '../lib/avatarIcon';
 import { UserActionsPanel } from './UserActionsPanel';
 import { GoshaPanel } from '../../simulation/GoshaPanel';
+import { BotsPanel } from '../../simulation/BotsPanel';
 import { focusOnMap, panSmoothlyTo } from '../lib/mapFocus';
 
 const TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const ATTR = '© OpenStreetMap contributors';
 const FOCUS_ZOOM = 17;
 
-interface MapProps {
-  routePoints?: [number, number][];
-}
-
-export function Map({ routePoints }: MapProps) {
+export function Map() {
   const { connected, others, myCoords, userName } = useLocationTracker();
+  const { profile } = useMyProfile();
+  const { friendIds } = useFriendIds();
+
+  const {
+    points: routePoints,
+    loading: routeLoading,
+    error,
+    buildRoute,
+    clear: clearRoute,
+  } = useRoutingTo();
+
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const mapRef = useRef<L.Map | null>(null);
 
-  const selectedUser = others.find((u) => u.id === selectedUserId) ?? null;
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Фокус на пользователе, переданном через /map?focus=uid
+  useEffect(() => {
+    const focusUid = searchParams.get('focus');
+    if (!focusUid) return;
+    setSelectedUserId(focusUid);
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  // Показываем: своих друзей + Гошу (для теста)
+  const visibleOthers = others.filter(
+    (u) => friendIds.has(u.id) || u.id === 'sim-gosha',
+  );
+
+  const selectedUser = visibleOthers.find((u) => u.id === selectedUserId) ?? null;
   const center: [number, number] = [55.7558, 37.6173];
 
   return (
@@ -46,27 +73,23 @@ export function Map({ routePoints }: MapProps) {
 
         <FollowUser user={selectedUser} />
 
+        {/* Подгоняет вид карты под маршрут */}
+        <FitToRoute points={routePoints} />
+
         <MapClickHandler onMapClick={() => setSelectedUserId(null)} />
 
         {myCoords && (
           <Marker
             position={[myCoords.latitude, myCoords.longitude]}
             icon={createAvatarIcon({
-              name: userName,
-              avatarUrl: null,
-              online: true,
+              name: profile?.name || userName,
+              avatarUrl: profile?.avatarUrl ?? null,
               theme: 'light',
             })}
-          >
-              {/* <Popup>
-                <strong>{userName}</strong>
-                <br />
-                Это ты
-              </Popup> */}
-          </Marker>
+          />
         )}
 
-        {others.map(
+        {visibleOthers.map(
           (user) =>
             user.lat !== null &&
             user.lng !== null && (
@@ -76,9 +99,10 @@ export function Map({ routePoints }: MapProps) {
                 icon={createAvatarIcon({
                   name: user.name,
                   avatarUrl: null,
-                  online: true,
                   theme: 'light',
                 })}
+                riseOnHover
+                keyboard={false}
                 eventHandlers={{
                   click: (e) => {
                     L.DomEvent.stopPropagation(e);
@@ -89,15 +113,46 @@ export function Map({ routePoints }: MapProps) {
             ),
         )}
 
-        {routePoints && routePoints.length > 1 && (
-          <Polyline positions={routePoints} color="#0ABAB5" weight={5} />
+        {/* Линия маршрута — красная с подсветкой */}
+        {routePoints.length > 1 && (
+          <>
+            {/* Внешнее свечение */}
+            <Polyline positions={routePoints} color="#ff4444" weight={16} opacity={0.25} />
+            {/* Белая обводка */}
+            <Polyline positions={routePoints} color="#ffffff" weight={9} opacity={0.9} />
+            {/* Яркая красная линия */}
+            <Polyline positions={routePoints} color="#ff4444" weight={5} />
+          </>
         )}
 
         <ZoomControls myCoords={myCoords ?? null} />
         <ZoomIndicator />
       </MapContainer>
 
-      {selectedUser && <UserActionsPanel user={selectedUser} />}
+      {selectedUser && (
+        <UserActionsPanel
+          user={selectedUser}
+          onBuildRoute={() => {
+            if (
+              !myCoords ||
+              selectedUser.lat === null ||
+              selectedUser.lng === null
+            ) {
+              return;
+            }
+            buildRoute({
+              fromLat: myCoords.latitude,
+              fromLng: myCoords.longitude,
+              toLat: selectedUser.lat,
+              toLng: selectedUser.lng,
+            });
+          }}
+          onClearRoute={clearRoute}
+          routeLoading={routeLoading}
+          routeError={error}
+          hasRoute={routePoints.length > 1}
+        />
+      )}
 
       {/* Индикатор подключения */}
       <div
@@ -126,7 +181,7 @@ export function Map({ routePoints }: MapProps) {
             boxShadow: connected ? '0 0 8px #0ABAB5' : 'none',
           }}
         />
-        {connected ? `В сети · ${others.length + 1} чел.` : 'Не подключено'}
+        {connected ? `Друзей онлайн: ${visibleOthers.length}` : 'Не подключено'}
       </div>
 
       {/* Атрибуция */}
@@ -147,7 +202,63 @@ export function Map({ routePoints }: MapProps) {
         {ATTR} | Leaflet
       </div>
 
-      {/* Панель симуляции Гоши */}
+            {/* Плавающая кнопка «Убрать маршрут» — показывается, когда панель скрыта, но маршрут есть */}
+      {!selectedUser && routePoints.length > 1 && (
+        <button
+          onClick={clearRoute}
+          title="Убрать маршрут"
+          style={{
+            position: 'absolute',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '12px 20px',
+            background: 'var(--bg-header)',
+            color: '#ff4444',
+            border: '1px solid #ff4444',
+            borderRadius: 12,
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 0 20px rgba(255, 68, 68, 0.5), 0 8px 24px rgba(0, 0, 0, 0.3)',
+            zIndex: 1200,
+            transition: '0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 68, 68, 0.15)';
+            e.currentTarget.style.boxShadow =
+              '0 0 32px rgba(255, 68, 68, 0.8), 0 8px 24px rgba(0, 0, 0, 0.3)';
+            e.currentTarget.style.transform = 'translateX(-50%) scale(1.05)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'var(--bg-header)';
+            e.currentTarget.style.boxShadow =
+              '0 0 20px rgba(255, 68, 68, 0.5), 0 8px 24px rgba(0, 0, 0, 0.3)';
+            e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
+          }}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+          <span>Убрать маршрут</span>
+        </button>
+      )}
+
+      <BotsPanel />
+
       <GoshaPanel
         onFocus={(pos) => {
           const map = mapRef.current;
@@ -181,12 +292,6 @@ function CenterOnMe({
   return null;
 }
 
-/**
- * Слежение за выбранным пользователем.
- * - Первый клик — flyTo с зумом.
- * - Дальше — panTo с throttle (не чаще 1 раза в 500 мс)
- *   и порогом по расстоянию (минимум 2 м сдвига).
- */
 function FollowUser({
   user,
 }: {
@@ -208,7 +313,6 @@ function FollowUser({
     const isNewSelection = prevId.current !== user.id;
     prevId.current = user.id;
 
-    // Первый клик — плавный полёт с зумом
     if (isNewSelection) {
       focusOnMap(map, user.lat, user.lng, { zoom: FOCUS_ZOOM });
       lastCenter.current = { lat: user.lat, lng: user.lng };
@@ -216,14 +320,13 @@ function FollowUser({
       return;
     }
 
-    // Последующие обновления — panTo
     const now = Date.now();
     if (now < nextPanAllowed.current) return;
 
     const last = lastCenter.current;
     if (last) {
       const moved = distanceMeters(last.lat, last.lng, user.lat, user.lng);
-      if (moved < 2) return; // игнорируем мелкий GPS-шум
+      if (moved < 2) return;
     }
 
     lastCenter.current = { lat: user.lat, lng: user.lng };
@@ -235,7 +338,30 @@ function FollowUser({
   return null;
 }
 
-/* Расстояние между координатами в метрах */
+/** Подгоняет вид карты под массив точек (например, под маршрут) */
+function FitToRoute({ points }: { points: [number, number][] }) {
+  const map = useMap();
+  const lastFitKey = useRef<string>('');
+
+  useEffect(() => {
+    if (points.length < 2) return;
+
+    // Ключ — по первой и последней точке, чтобы не дёргать fitBounds при каждом рендере
+    const key = `${points[0][0]}_${points[0][1]}_${points[points.length - 1][0]}_${points[points.length - 1][1]}`;
+    if (key === lastFitKey.current) return;
+    lastFitKey.current = key;
+
+    const bounds = L.latLngBounds(points.map((p) => L.latLng(p[0], p[1])));
+    map.fitBounds(bounds, {
+      padding: [80, 80],
+      animate: true,
+      duration: 0.9,
+    });
+  }, [points, map]);
+
+  return null;
+}
+
 function distanceMeters(
   lat1: number,
   lng1: number,
@@ -253,15 +379,6 @@ function distanceMeters(
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-/* Описание скорости в человекочитаемом виде */
-function describeSpeed(speedMps: number): string {
-  const kmh = speedMps * 3.6;
-  if (kmh < 7) return `🚶 идёт · ${kmh.toFixed(1)} км/ч`;
-  if (kmh < 25) return `🚴 едет · ${kmh.toFixed(1)} км/ч`;
-  return `🚗 едет · ${kmh.toFixed(1)} км/ч`;
-}
-
-/** Сбрасывает выбор при клике по пустому месту карты */
 function MapClickHandler({ onMapClick }: { onMapClick: () => void }) {
   const map = useMap();
 
@@ -275,7 +392,6 @@ function MapClickHandler({ onMapClick }: { onMapClick: () => void }) {
   return null;
 }
 
-/** Показывает зум в левом нижнем углу на 2 секунды после изменения */
 function ZoomIndicator() {
   const map = useMap();
   const [zoom, setZoom] = useState<number | null>(null);
@@ -318,8 +434,6 @@ function ZoomIndicator() {
     </div>
   );
 }
-
-/* ==================== Кнопки зума ==================== */
 
 function ZoomControls({
   myCoords,
@@ -431,7 +545,6 @@ const TargetIcon = () => (
   </svg>
 );
 
-/** Сохраняет экземпляр карты Leaflet в ref родителя */
 function MapRefSaver({
   mapRef,
 }: {

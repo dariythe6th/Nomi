@@ -1,11 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocationContext } from './useLocationContext';
-import {
-  socket,
-  getOrCreateUserId,
-  getOrCreateUserName,
-  saveUserName,
-} from '../../shared/lib/socket';
+import { useAuth } from '../auth/useAuth';
+import { socket, getOrCreateUserId } from '../../shared/lib/socket';
 import type { RemoteUser } from './types';
 
 /** Порог, ниже которого считаем «стоит» (м/с) */
@@ -34,12 +30,17 @@ interface Point {
 }
 
 export function useLocationTracker() {
+  const { user } = useAuth();
+
+  // Имя берём из Firebase, с фолбэками на email и «Гость»
+  const userName =
+    user?.displayName || user?.email?.split('@')[0] || 'Гость';
+
+  // id для сокета — стабильный. Для залогиненного используем uid Firebase
+  const userId = useRef<string>(user?.uid ?? getOrCreateUserId());
+
   const [connected, setConnected] = useState(false);
   const [others, setOthers] = useState<RemoteUser[]>([]);
-  const [userName, setUserNameState] = useState(getOrCreateUserName());
-
-  const userId = useRef(getOrCreateUserId());
-  const userNameRef = useRef(userName);
 
   /** История точек за последние 3 сек — для расчёта средней скорости */
   const historyRef = useRef<Map<string, Point[]>>(new Map());
@@ -54,15 +55,11 @@ export function useLocationTracker() {
   } = useLocationContext();
 
   useEffect(() => {
-    userNameRef.current = userName;
-  }, [userName]);
-
-  useEffect(() => {
     socket.connect();
 
     const onConnect = () => {
       setConnected(true);
-      socket.emit('register', { id: userId.current, name: userNameRef.current });
+      socket.emit('register', { id: userId.current, name: userName });
     };
 
     const onDisconnect = () => setConnected(false);
@@ -85,6 +82,7 @@ export function useLocationTracker() {
 
     const onLocationUpdate = (data: {
       id: string;
+      name?: string;
       lat: number;
       lng: number;
       accuracy: number;
@@ -115,12 +113,10 @@ export function useLocationTracker() {
       // === Время стояния ===
       let stationarySince: number;
       if (speed < STATIONARY_SPEED_MPS) {
-        // Если уже стоял — сохраняем прежнее время; если нет — начинаем отсчёт
         stationarySince = stationaryMap.get(data.id) ?? now;
         stationaryMap.set(data.id, stationarySince);
         speed = 0;
       } else {
-        // Движется — сбрасываем «время стояния»
         stationaryMap.delete(data.id);
         stationarySince = now;
       }
@@ -132,7 +128,7 @@ export function useLocationTracker() {
             ...prevList,
             {
               id: data.id,
-              name: 'Гость',
+              name: data.name || 'Гость', 
               lat: data.lat,
               lng: data.lng,
               accuracy: data.accuracy,
@@ -143,7 +139,14 @@ export function useLocationTracker() {
           ];
         }
         const updated = [...prevList];
-        updated[idx] = { ...updated[idx], ...data, speed, stationarySince };
+        updated[idx] = {
+          ...updated[idx],
+          ...data,
+          // Сохраняем ранее известное имя, если новое не пришло
+          name: data.name || updated[idx].name,
+          speed,
+          stationarySince,
+        };
         return updated;
       });
     };
@@ -169,8 +172,10 @@ export function useLocationTracker() {
       socket.off('location-update', onLocationUpdate);
       socket.off('user-left', onUserLeft);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Отправка своих координат
   useEffect(() => {
     if (!connected || !coords) return;
     socket.emit('location', {
@@ -181,6 +186,14 @@ export function useLocationTracker() {
     });
   }, [connected, coords]);
 
+  // Если имя пользователя загрузилось позже (Firebase асинхронный) — перерегистрируемся
+  useEffect(() => {
+    if (!connected) return;
+    if (!user) return;
+    socket.emit('register', { id: userId.current, name: userName });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid, userName]);
+
   return {
     connected,
     others,
@@ -188,10 +201,5 @@ export function useLocationTracker() {
     isGeolocationAvailable,
     isGeolocationEnabled,
     userName,
-    setUserName: (name: string) => {
-      setUserNameState(name);
-      saveUserName(name);
-      socket.emit('register', { id: userId.current, name });
-    },
   };
 }

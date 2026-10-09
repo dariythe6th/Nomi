@@ -1,5 +1,7 @@
-import { NavLink, Outlet, Link } from 'react-router-dom';
+import { NavLink, Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../shared/theme/useTheme';
+import { logoutUser } from '../../features/auth/api';
+import { useMyProfile } from '../../features/profile/useMyProfile';
 
 /* ===== SVG-иконки ===== */
 
@@ -55,6 +57,28 @@ const MoonIcon = () => (
   </svg>
 );
 
+const LogoutIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+);
+
+const UserSilhouetteIcon = () => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="#ffffff"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21 C4 15 8 13 12 13 C16 13 20 15 20 21 Z" />
+  </svg>
+);
+
 /* ===== Пункты меню ===== */
 
 const navItems = [
@@ -68,6 +92,17 @@ const navItems = [
 
 export function MainLayout() {
   const { theme, toggle } = useTheme();
+  const { profile } = useMyProfile();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // На карте меню плавает поверх — отступ не нужен
+  const isMapPage = location.pathname === '/map';
+
+  const handleLogout = async () => {
+    await logoutUser();
+    navigate('/login');
+  };
 
   return (
     <div
@@ -132,42 +167,64 @@ export function MainLayout() {
             to="/profile"
             title="Профиль"
             style={{
-              position: 'relative',
               width: 40,
               height: 40,
               borderRadius: '50%',
               background: 'var(--accent)',
-              color: '#fff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 16,
-              fontWeight: 600,
               textDecoration: 'none',
               border: '2px solid var(--accent)',
               boxShadow: '0 0 10px var(--accent-glow)',
+              overflow: 'hidden',
             }}
           >
-            Е
-            <span
-              style={{
-                position: 'absolute',
-                right: -2,
-                bottom: -2,
-                width: 12,
-                height: 12,
-                borderRadius: '50%',
-                background: '#ffffff',
-                border: '2px solid var(--bg-header)',
-              }}
-            />
+            {profile?.avatarUrl ? (
+              <img
+                src={profile.avatarUrl}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              <UserSilhouetteIcon />
+            )}
           </Link>
+
+          <button
+            onClick={handleLogout}
+            title="Выйти из аккаунта"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 14px',
+              background: 'transparent',
+              color: 'var(--text-header)',
+              border: '1px solid var(--border-strong)',
+              borderRadius: 8,
+              fontSize: 13,
+              cursor: 'pointer',
+              transition: '0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 68, 68, 0.15)';
+              e.currentTarget.style.borderColor = '#ff4444';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.borderColor = 'var(--border-strong)';
+            }}
+          >
+            <LogoutIcon />
+            <span>Выйти</span>
+          </button>
         </div>
       </header>
 
       {/* Основная область */}
       <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
-        {/* Меню — по центру слева, в цвете шапки */}
+        {/* Меню — по центру слева */}
         <nav
           style={{
             position: 'absolute',
@@ -210,7 +267,16 @@ export function MainLayout() {
           ))}
         </nav>
 
-        <main style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+        <main
+          style={{
+            width: '100%',
+            height: '100%',
+            overflow: 'hidden',
+            // На всех страницах кроме карты оставляем место под меню
+            paddingLeft: isMapPage ? 0 : 180,
+            boxSizing: 'border-box',
+          }}
+        >
           <Outlet />
         </main>
       </div>

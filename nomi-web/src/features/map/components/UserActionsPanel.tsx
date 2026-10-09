@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react';
 import type { RemoteUser } from '../../location/types';
+import { getUserProfile } from '../../profile/api';
+import type { UserProfile } from '../../profile/types';
 
 interface Props {
   user: RemoteUser;
+  onBuildRoute?: () => void;
+  onClearRoute?: () => void;
+  routeLoading?: boolean;
+  routeError?: string | null;
+  hasRoute?: boolean;
 }
-
-const ProfileIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
 
 const MessageIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -37,17 +36,26 @@ const ReactionIcon = () => (
   </svg>
 );
 
-const buttons = [
-  { label: 'Профиль', Icon: ProfileIcon },
-  { label: 'Написать', Icon: MessageIcon },
-  { label: 'Вызов', Icon: CallIcon },
-  { label: 'Реакции', Icon: ReactionIcon },
-];
+const ProfileIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+);
 
-/** Порог, ниже которого считаем «стоит» (м/с) */
+const RouteIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="6" cy="19" r="3" />
+    <circle cx="18" cy="5" r="3" />
+    <path d="M9 19h6a4 4 0 0 0 4-4v-1" />
+    <path d="M15 5H9a4 4 0 0 0-4 4v1" />
+  </svg>
+);
+
 const STATIONARY_SPEED_MPS = 0.3;
 
-/** Описание скорости для движущегося пользователя */
 function describeSpeed(speedMps: number): string {
   const kmh = speedMps * 3.6;
   if (kmh < 7) return `🚶 идёт · ${kmh.toFixed(1)} км/ч`;
@@ -55,10 +63,8 @@ function describeSpeed(speedMps: number): string {
   return `🚗 едет · ${kmh.toFixed(1)} км/ч`;
 }
 
-/** Форматирует «сколько стоит на месте»: секунды → минуты → часы → дни */
 function formatStationary(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
-
   if (totalSec < 60) return `${totalSec} сек`;
   if (totalSec < 3600) {
     const m = Math.floor(totalSec / 60);
@@ -75,14 +81,34 @@ function formatStationary(ms: number): string {
   return h > 0 ? `${d} д ${h} ч` : `${d} д`;
 }
 
-export function UserActionsPanel({ user }: Props) {
-  // Храним текущее время в state — обновляем раз в секунду
+export function UserActionsPanel({
+  user,
+  onBuildRoute,
+  onClearRoute,
+  routeLoading,
+  routeError,
+  hasRoute,
+}: Props) {
   const [now, setNow] = useState(() => Date.now());
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setProfile(null);
+    getUserProfile(user.id)
+      .then((p) => {
+        if (!cancelled) setProfile(p);
+      })
+      .catch((e) => console.warn('Не удалось загрузить профиль:', e));
+    return () => {
+      cancelled = true;
+    };
+  }, [user.id]);
 
   const isStationary = !user.speed || user.speed < STATIONARY_SPEED_MPS;
 
@@ -91,6 +117,8 @@ export function UserActionsPanel({ user }: Props) {
         now - (user.stationarySince ?? now),
       )}`
     : describeSpeed(user.speed ?? 0);
+
+  const displayName = profile?.name || user.name;
 
   return (
     <div
@@ -104,9 +132,10 @@ export function UserActionsPanel({ user }: Props) {
         alignItems: 'center',
         gap: 8,
         zIndex: 1200,
+        maxWidth: '90vw',
       }}
     >
-      {/* Информационная плашка над кнопками */}
+      {/* Имя + статус */}
       <div
         style={{
           display: 'flex',
@@ -123,7 +152,7 @@ export function UserActionsPanel({ user }: Props) {
           whiteSpace: 'nowrap',
         }}
       >
-        <span>{user.name}</span>
+        <span>{displayName}</span>
         <span
           style={{
             width: 1,
@@ -142,7 +171,50 @@ export function UserActionsPanel({ user }: Props) {
         </span>
       </div>
 
-      {/* Панель с кнопками */}
+      {/* Статус из профиля */}
+      <div
+        style={{
+          padding: '6px 16px',
+          background: 'var(--bg-header)',
+          color: 'var(--text-header-muted)',
+          border: '1px solid var(--border-strong)',
+          borderRadius: 12,
+          fontSize: 13,
+          maxWidth: 360,
+          textAlign: 'center',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+        }}
+      >
+        {profile?.status ? (
+          `💬 ${profile.status}`
+        ) : (
+          <span style={{ opacity: 0.5 }}>— статус не указан —</span>
+        )}
+      </div>
+
+      {/* Ошибка маршрута */}
+      {routeError && (
+        <div
+          style={{
+            padding: '8px 16px',
+            background: '#ff4444',
+            color: '#ffffff',
+            border: '2px solid #ffffff',
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 600,
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
+            textAlign: 'center',
+          }}
+        >
+          ⚠️ {routeError}
+        </div>
+      )}
+
+      {/* Кнопки */}
       <div
         style={{
           display: 'flex',
@@ -152,9 +224,76 @@ export function UserActionsPanel({ user }: Props) {
           border: '1px solid var(--border-strong)',
           borderRadius: 16,
           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
         }}
       >
-        {buttons.map(({ label, Icon }) => (
+        {/* Кнопка маршрута */}
+        {onBuildRoute && (
+          hasRoute ? (
+            <button
+              onClick={onClearRoute}
+              title="Убрать маршрут"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 16px',
+                background: 'transparent',
+                color: '#ff4444',
+                border: '1px solid #ff4444',
+                borderRadius: 10,
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: '0.15s',
+                boxShadow: '0 0 12px rgba(255, 68, 68, 0.35)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 68, 68, 0.15)';
+                e.currentTarget.style.boxShadow = '0 0 20px rgba(255, 68, 68, 0.6)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.boxShadow = '0 0 12px rgba(255, 68, 68, 0.35)';
+              }}
+            >
+              <RouteIcon />
+              <span>Убрать маршрут</span>
+            </button>
+          ) : (
+            <button
+              onClick={routeLoading ? undefined : onBuildRoute}
+              title="Построить маршрут"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 16px',
+                background: 'var(--accent)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 10,
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: routeLoading ? 'wait' : 'pointer',
+                transition: '0.15s',
+                boxShadow: '0 0 12px var(--accent-glow)',
+              }}
+            >
+              <RouteIcon />
+              <span>{routeLoading ? 'Строим…' : 'Маршрут'}</span>
+            </button>
+          )
+        )}
+
+        {/* Остальные кнопки — пока заморожены */}
+        {[
+          { label: 'Написать', Icon: MessageIcon },
+          { label: 'Вызов', Icon: CallIcon },
+          { label: 'Реакции', Icon: ReactionIcon },
+          { label: 'Профиль', Icon: ProfileIcon },
+        ].map(({ label, Icon }) => (
           <button
             key={label}
             disabled

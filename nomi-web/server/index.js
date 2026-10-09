@@ -71,6 +71,7 @@ io.on('connection', (socket) => {
 
     socket.broadcast.emit('location-update', {
       id,
+      name: user.name,            // ← добавили имя
       lat,
       lng,
       accuracy,
