@@ -1,75 +1,34 @@
-# React + TypeScript + Vite
+# Nomi 🌍
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Nomi** — это геосоциальное веб-приложение (вдохновленное Blink и Zenly), которое позволяет пользователям видеть местоположение друзей на карте в реальном времени, отслеживать их статус, обмениваться геоданными и строить маршруты для встреч.
 
-Currently, two official plugins are available:
+Проект разработан в рамках дипломной работы.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## ✨ Функционал приложения
 
-## React Compiler
+*   **🔐 Аутентификация**: Регистрация и вход по Email/Password с использованием Firebase Auth. Защита приватных маршрутов (редирект на страницу входа для неавторизованных пользователей).
+*   **🗺️ Карта в реальном времени**: Отображение карты на базе OpenStreetMap (Leaflet). Ваше местоположение определяется через GPS браузера и транслируется на сервер.
+*   **📍 Трекинг друзей**: Отображение маркеров друзей на карте. Данные о координатах передаются по WebSocket (Socket.IO) с минимальной задержкой. 
+*   **🏃‍♂️ Умный статус**: Под каждым пользователем рассчитывается его скорость передвижения. Если скорость падает до нуля, система автоматически засекает время, которое человек «кукует на месте» (стоит без движения).
+*   **👥 Система друзей**: Поиск зарегистрированных пользователей по точному email, отправка и принятие заявок в друзья. Отображение на карте только тех людей, которые есть в вашем списке друзей.
+*   **🛣️ Построение маршрутов**: Интеграция с OSRM API. Вы можете кликнуть на друга и построить к нему пешеходный маршрут. Линия маршрута отрисовывается на карте, а интерфейс автоматически подстраивает масштаб, чтобы уместить весь путь.
+*   **👤 Профиль пользователя**: Возможность изменить свое отображаемое имя, установить текстовый статус («Чем занимаешься?») и загрузить аватарку. Аватарки отображаются как в шапке сайта, так и на маркерах карты (интеграция с ImgBB для хранения фото).
+*   **🎨 Пользовательский интерфейс**: Поддержка светлой и темной тем. Плавные анимации карты (flyTo, fitBounds), кастомные круглые маркеры, выезжающие панели управления.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🛠 Технологический стек
 
-## Expanding the ESLint configuration
+**Клиент (Frontend):**
+*   **React 18** + **TypeScript** (сборка через Vite)
+*   **Leaflet** + **OpenStreetMap** (картография)
+*   **React Router v6** (навигация между страницами)
+*   **CSS-переменные** (динамическое переключение тем)
+*   **Socket.IO Client** (получение координат в реальном времени)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+**Сервер (Backend):**
+*   **Node.js** + **Express** (базовый HTTP сервер)
+*   **Socket.IO Server** (WebSocket-сервер для трансляции GPS-координат между клиентами)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
-
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
+**Сторонние сервисы и API:**
+*   **Firebase**: Authentication (авторизация) и Firestore (база данных для профилей и связей друзей).
+*   **OSRM API**: Открытый движок для построения пешеходных маршрутов.
+*   **ImgBB API**: Бесплатный хостинг изображений для аватарок.
