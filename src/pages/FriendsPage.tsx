@@ -13,7 +13,7 @@ import {
 } from '../features/friends/api';
 import type { UserSearchResult, FriendRequest } from '../features/friends/types';
 
-/* ==== Иконки действий ==== */
+/* ==== Иконки ==== */
 
 const MessageIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -27,6 +27,16 @@ const MapPinIcon = () => (
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
     <circle cx="12" cy="10" r="3" />
+  </svg>
+);
+
+const PhoneBookIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 );
 
@@ -135,7 +145,7 @@ export function FriendsPage() {
     navigate(`/map?focus=${friend.uid}`);
   };
 
-  /* Стили */
+  /* ==== Стили ==== */
   const cardStyle: React.CSSProperties = {
     padding: 20,
     background: 'var(--bg-panel)',
@@ -192,204 +202,256 @@ export function FriendsPage() {
   };
 
   return (
-    <div style={{ padding: 24, height: '100%', overflowY: 'auto', maxWidth: 720 }}>
+    <div style={{ padding: 24, height: '100%', overflowY: 'auto' }}>
       <h1 style={{ color: 'var(--text)', marginBottom: 20 }}>Друзья</h1>
 
-      {/* === Поиск === */}
-      <div style={cardStyle}>
-        <h2 style={{ fontSize: 16, color: 'var(--text)', marginBottom: 12 }}>
-          Найти пользователя
-        </h2>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            type="email"
-            value={searchEmail}
-            onChange={(e) => setSearchEmail(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="email@example.com"
-            style={inputStyle}
-          />
-          <button onClick={handleSearch} disabled={searching} style={primaryBtnStyle}>
-            {searching ? 'Ищем…' : 'Найти'}
-          </button>
-        </div>
-
-        {searchError && (
-          <p style={{ color: '#ff8080', fontSize: 13, marginTop: 10 }}>{searchError}</p>
-        )}
-
-        {requestSent && (
-          <p style={{ color: 'var(--accent)', fontSize: 13, marginTop: 10 }}>
-            ✓ Заявка отправлена
-          </p>
-        )}
-
-        {searchResult && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: 12,
-              marginTop: 12,
-              background: 'var(--bg-hover)',
-              borderRadius: 10,
-            }}
-          >
-            <Avatar user={searchResult} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, color: 'var(--text)' }}>
-                {searchResult.name}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {searchResult.email}
-              </div>
+      {/* Двухколоночная сетка */}
+      <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        
+        {/* ================= ЛЕВАЯ КОЛОНКА ================= */}
+        <div style={{ flex: '1 1 500px', minWidth: 0 }}>
+          {/* Поиск */}
+          <div style={cardStyle}>
+            <h2 style={{ fontSize: 16, color: 'var(--text)', marginBottom: 12 }}>
+              Найти пользователя
+            </h2>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="email"
+                value={searchEmail}
+                onChange={(e) => setSearchEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                placeholder="email@example.com"
+                style={inputStyle}
+              />
+              <button onClick={handleSearch} disabled={searching} style={primaryBtnStyle}>
+                {searching ? 'Ищем…' : 'Найти'}
+              </button>
             </div>
-            <button onClick={handleSendRequest} style={primaryBtnStyle}>
-              Добавить
-            </button>
-          </div>
-        )}
-      </div>
 
-      {/* === Входящие заявки === */}
-      {incoming.length > 0 && (
-        <div style={cardStyle}>
-          <h2 style={{ fontSize: 16, color: 'var(--text)', marginBottom: 12 }}>
-            Входящие заявки ({incoming.length})
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {incoming.map((req) => (
+            {searchError && (
+              <p style={{ color: '#ff8080', fontSize: 13, marginTop: 10 }}>{searchError}</p>
+            )}
+
+            {requestSent && (
+              <p style={{ color: 'var(--accent)', fontSize: 13, marginTop: 10 }}>
+                ✓ Заявка отправлена
+              </p>
+            )}
+
+            {searchResult && (
               <div
-                key={req.id}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 12,
                   padding: 12,
+                  marginTop: 12,
                   background: 'var(--bg-hover)',
                   borderRadius: 10,
                 }}
               >
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: '50%',
-                    background: 'var(--accent)',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  {req.fromAvatar ? (
-                    <img
-                      src={req.fromAvatar}
-                      alt=""
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <UserSilhouette />
-                  )}
-                </div>
-                <div style={{ flex: 1, color: 'var(--text)', fontWeight: 500 }}>
-                  {req.fromName}
-                </div>
-                <button
-                  onClick={() => handleAccept(req)}
-                  style={{ ...primaryBtnStyle, padding: '8px 14px', fontSize: 13 }}
-                >
-                  Принять
-                </button>
-                <button onClick={() => handleDecline(req)} style={secondaryBtnStyle}>
-                  Отклонить
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* === Список друзей === */}
-      <div style={cardStyle}>
-        <h2 style={{ fontSize: 16, color: 'var(--text)', marginBottom: 12 }}>
-          Мои друзья ({friends.length})
-        </h2>
-
-        {loadingLists ? (
-          <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Загружаем…</p>
-        ) : friends.length === 0 ? (
-          <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-            Пока никого нет. Найдите друга по email выше.
-          </p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {friends.map((f) => (
-              <div
-                key={f.uid}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: 12,
-                  background: 'var(--bg-hover)',
-                  borderRadius: 10,
-                }}
-              >
-                <Avatar user={f} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text)' }}>{f.name}</div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: 'var(--text-muted)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {f.email}
+                <Avatar user={searchResult} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text)' }}>
+                    {searchResult.name}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {searchResult.email}
                   </div>
                 </div>
-
-                {/* Кнопки действий */}
-                <button
-                  onClick={() => handleChat(f)}
-                  title="Написать в чат"
-                  style={iconBtnStyle}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--accent)';
-                    e.currentTarget.style.color = '#fff';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = 'var(--accent)';
-                  }}
-                >
-                  <MessageIcon />
-                </button>
-
-                <button
-                  onClick={() => handleShowOnMap(f)}
-                  title="Показать на карте"
-                  style={iconBtnStyle}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--accent)';
-                    e.currentTarget.style.color = '#fff';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = 'var(--accent)';
-                  }}
-                >
-                  <MapPinIcon />
+                <button onClick={handleSendRequest} style={primaryBtnStyle}>
+                  Добавить
                 </button>
               </div>
-            ))}
+            )}
           </div>
-        )}
+
+          {/* Список друзей */}
+          <div style={cardStyle}>
+            <h2 style={{ fontSize: 16, color: 'var(--text)', marginBottom: 12 }}>
+              Мои друзья ({friends.length})
+            </h2>
+
+            {loadingLists ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Загружаем…</p>
+            ) : friends.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                Пока никого нет. Найдите друга по email выше.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {friends.map((f) => (
+                  <div
+                    key={f.uid}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: 12,
+                      background: 'var(--bg-hover)',
+                      borderRadius: 10,
+                    }}
+                  >
+                    <Avatar user={f} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text)' }}>{f.name}</div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: 'var(--text-muted)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {f.email}
+                      </div>
+                    </div>
+
+                    {/* Кнопки действий */}
+                    <button
+                      onClick={() => handleChat(f)}
+                      title="Написать в чат"
+                      style={iconBtnStyle}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--accent)';
+                        e.currentTarget.style.color = '#fff';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'var(--accent)';
+                      }}
+                    >
+                      <MessageIcon />
+                    </button>
+
+                    <button
+                      onClick={() => handleShowOnMap(f)}
+                      title="Показать на карте"
+                      style={iconBtnStyle}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--accent)';
+                        e.currentTarget.style.color = '#fff';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'var(--accent)';
+                      }}
+                    >
+                      <MapPinIcon />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ================= ПРАВАЯ КОЛОНКА ================= */}
+        <div style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
+          
+          {/* Входящие заявки (теперь отображается всегда) */}
+          <div style={{ ...cardStyle, marginBottom: 0 }}>
+            <h2 style={{ fontSize: 16, color: 'var(--text)', marginBottom: 12 }}>
+              Заявки в друзья {incoming.length > 0 && `(${incoming.length})`}
+            </h2>
+            
+            {incoming.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                У вас пока нет новых заявок.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {incoming.map((req) => (
+                  <div
+                    key={req.id}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 10,
+                      padding: 12,
+                      background: 'var(--bg-hover)',
+                      borderRadius: 10,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: '50%',
+                          background: 'var(--accent)',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {req.fromAvatar ? (
+                          <img src={req.fromAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <UserSilhouette />
+                        )}
+                      </div>
+                      <div style={{ flex: 1, color: 'var(--text)', fontWeight: 500 }}>
+                        {req.fromName}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => handleAccept(req)}
+                        style={{ ...primaryBtnStyle, flex: 1, padding: '8px 0', fontSize: 13 }}
+                      >
+                        Принять
+                      </button>
+                      <button
+                        onClick={() => handleDecline(req)}
+                        style={{ ...secondaryBtnStyle, flex: 1, padding: '8px 0' }}
+                      >
+                        Отклонить
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Синхронизация контактов */}
+          <div style={{ ...cardStyle, marginBottom: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{ color: 'var(--accent)' }}>
+                <PhoneBookIcon />
+              </div>
+              <h2 style={{ fontSize: 16, color: 'var(--text)', margin: 0 }}>
+                Контакты
+              </h2>
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.5 }}>
+              Синхронизируйте телефонную книгу, чтобы быстрее находить друзей, которые уже используют Nomi.
+            </p>
+            <button
+              disabled
+              title="Функция появится в будущих обновлениях"
+              style={{
+                width: '100%',
+                padding: '10px',
+                background: 'transparent',
+                color: 'var(--text-muted)',
+                border: '1px dashed var(--border-strong)',
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'not-allowed',
+              }}
+            >
+              Скоро (в разработке)
+            </button>
+          </div>
+
+        </div>
       </div>
     </div>
   );
