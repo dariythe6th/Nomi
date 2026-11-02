@@ -79,7 +79,12 @@ export function FriendsPage() {
 
   useEffect(() => {
     if (!user) return;
-    void refresh();
+
+    // Оборачиваем в микротаск, чтобы избежать синхронного setState в useEffect
+    queueMicrotask(() => {
+      void refresh();
+    });
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
