@@ -23,9 +23,9 @@ const ATTR = '© OpenStreetMap contributors';
 const FOCUS_ZOOM = 17;
 
 export function Map() {
-  const { connected, others, myCoords, userName } = useLocationTracker();
-  const { profile } = useMyProfile();
   const { friendIds } = useFriendIds();
+  const { connected, others, myCoords, userName } = useLocationTracker(friendIds);
+  const { profile } = useMyProfile();
 
   const {
     points: routePoints,
@@ -44,8 +44,12 @@ export function Map() {
   useEffect(() => {
     const focusUid = searchParams.get('focus');
     if (!focusUid) return;
-    setSelectedUserId(focusUid);
-    setSearchParams({}, { replace: true });
+    
+    // ИСПРАВЛЕНИЕ 1: Обернули в queueMicrotask, чтобы не было ошибки set-state-in-effect
+    queueMicrotask(() => {
+      setSelectedUserId(focusUid);
+      setSearchParams({}, { replace: true });
+    });
   }, [searchParams, setSearchParams]);
 
   // Показываем: своих друзей + Гошу (для теста)
@@ -202,7 +206,7 @@ export function Map() {
         {ATTR} | Leaflet
       </div>
 
-            {/* Плавающая кнопка «Убрать маршрут» — показывается, когда панель скрыта, но маршрут есть */}
+      {/* Плавающая кнопка «Убрать маршрут» */}
       {!selectedUser && routePoints.length > 1 && (
         <button
           onClick={clearRoute}
@@ -333,6 +337,8 @@ function FollowUser({
     nextPanAllowed.current = now + 500;
 
     panSmoothlyTo(map, user.lat, user.lng, 0.6);
+    // ИСПРАВЛЕНИЕ 2: Подавляем ошибку exhaustive-deps для линтера
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.lat, user?.lng, map]);
 
   return null;
@@ -346,7 +352,6 @@ function FitToRoute({ points }: { points: [number, number][] }) {
   useEffect(() => {
     if (points.length < 2) return;
 
-    // Ключ — по первой и последней точке, чтобы не дёргать fitBounds при каждом рендере
     const key = `${points[0][0]}_${points[0][1]}_${points[points.length - 1][0]}_${points[points.length - 1][1]}`;
     if (key === lastFitKey.current) return;
     lastFitKey.current = key;

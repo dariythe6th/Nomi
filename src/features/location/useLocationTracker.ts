@@ -4,55 +4,32 @@ import { useAuth } from '../auth/useAuth';
 import { socket, getOrCreateUserId } from '../../shared/lib/socket';
 import type { RemoteUser } from './types';
 
-/** Порог, ниже которого считаем «стоит» (м/с) */
 const STATIONARY_SPEED_MPS = 0.3;
-
-/** Временное окно для расчёта скорости (мс) */
 const SPEED_WINDOW_MS = 3000;
 
-/** Расстояние между координатами в метрах (гаверсинус) */
 function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-interface Point {
-  lat: number;
-  lng: number;
-  t: number;
-}
+interface Point { lat: number; lng: number; t: number; }
 
-export function useLocationTracker() {
+// Принимаем список друзей как аргумент!
+export function useLocationTracker(friendIds: Set<string>) {
   const { user } = useAuth();
-
-  // Имя берём из Firebase, с фолбэками на email и «Гость»
-  const userName =
-    user?.displayName || user?.email?.split('@')[0] || 'Гость';
-
-  // id для сокета — стабильный. Для залогиненного используем uid Firebase
+  const userName = user?.displayName || user?.email?.split('@')[0] || 'Гость';
   const userId = useRef<string>(user?.uid ?? getOrCreateUserId());
 
   const [connected, setConnected] = useState(false);
   const [others, setOthers] = useState<RemoteUser[]>([]);
-
-  /** История точек за последние 3 сек — для расчёта средней скорости */
   const historyRef = useRef<Map<string, Point[]>>(new Map());
-
-  /** Время, с которого пользователь стоит на месте */
   const stationaryRef = useRef<Map<string, number>>(new Map());
+  const lastSentCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
 
-  const {
-    coords,
-    isAvailable: isGeolocationAvailable,
-    isEnabled: isGeolocationEnabled,
-  } = useLocationContext();
+  const { coords } = useLocationContext();
 
   useEffect(() => {
     socket.connect();
@@ -80,28 +57,17 @@ export function useLocationTracker() {
       });
     };
 
-    const onLocationUpdate = (data: {
-      id: string;
-      name?: string;
-      lat: number;
-      lng: number;
-      accuracy: number;
-      lastSeen: number;
-    }) => {
+    const onLocationUpdate = (data: { id: string; name?: string; lat: number; lng: number; accuracy: number; lastSeen: number; }) => {
       const now = Date.now();
       const history = historyRef.current;
       const stationaryMap = stationaryRef.current;
 
-      // === Обновляем историю точек ===
       const list = history.get(data.id) ?? [];
       list.push({ lat: data.lat, lng: data.lng, t: now });
-
-      // Оставляем только последние 3 секунды
       const cutoff = now - SPEED_WINDOW_MS;
       const recent = list.filter((p) => p.t > cutoff);
       history.set(data.id, recent);
 
-      // === Считаем скорость по временному окну ===
       let speed = 0;
       if (recent.length >= 2) {
         const oldest = recent[0];
@@ -110,7 +76,6 @@ export function useLocationTracker() {
         if (dt > 0) speed = dist / dt;
       }
 
-      // === Время стояния ===
       let stationarySince: number;
       if (speed < STATIONARY_SPEED_MPS) {
         stationarySince = stationaryMap.get(data.id) ?? now;
@@ -124,29 +89,10 @@ export function useLocationTracker() {
       setOthers((prevList) => {
         const idx = prevList.findIndex((u) => u.id === data.id);
         if (idx === -1) {
-          return [
-            ...prevList,
-            {
-              id: data.id,
-              name: data.name || 'Гость', 
-              lat: data.lat,
-              lng: data.lng,
-              accuracy: data.accuracy,
-              lastSeen: data.lastSeen,
-              speed,
-              stationarySince,
-            },
-          ];
+          return [...prevList, { id: data.id, name: data.name || 'Гость', lat: data.lat, lng: data.lng, accuracy: data.accuracy, lastSeen: data.lastSeen, speed, stationarySince }];
         }
         const updated = [...prevList];
-        updated[idx] = {
-          ...updated[idx],
-          ...data,
-          // Сохраняем ранее известное имя, если новое не пришло
-          name: data.name || updated[idx].name,
-          speed,
-          stationarySince,
-        };
+        updated[idx] = { ...updated[idx], ...data, name: data.name || updated[idx].name, speed, stationarySince };
         return updated;
       });
     };
@@ -172,34 +118,42 @@ export function useLocationTracker() {
       socket.off('location-update', onLocationUpdate);
       socket.off('user-left', onUserLeft);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userName]);
 
-  // Отправка своих координат
+  // При загрузке списка друзей — сообщаем серверу, кому нас слушать
+  useEffect(() => {
+    if (connected && user) {
+      socket.emit('update_friends', { userId: user.uid, friendIds: Array.from(friendIds) });
+    }
+  }, [connected, user, friendIds]);
+
+  // Отправка координат (Квантование + Net Dormancy)
   useEffect(() => {
     if (!connected || !coords) return;
+
+    const currentLat = coords.latitude;
+    const currentLng = coords.longitude;
+    const lastSent = lastSentCoordsRef.current;
+
+    // Net Dormancy: если сдвинулись меньше 2 метров, не отправляем
+    if (lastSent) {
+      const dist = distanceMeters(lastSent.lat, lastSent.lng, currentLat, currentLng);
+      if (dist < 2) return;
+    }
+
+    // Квантование: округляем до 5 знаков
+    const quantizedLat = +currentLat.toFixed(5);
+    const quantizedLng = +currentLng.toFixed(5);
+
     socket.emit('location', {
       id: userId.current,
-      lat: coords.latitude,
-      lng: coords.longitude,
-      accuracy: coords.accuracy,
+      lat: quantizedLat,
+      lng: quantizedLng,
+      accuracy: coords.accuracy ? Math.round(coords.accuracy) : 10,
     });
+
+    lastSentCoordsRef.current = { lat: currentLat, lng: currentLng };
   }, [connected, coords]);
 
-  // Если имя пользователя загрузилось позже (Firebase асинхронный) — перерегистрируемся
-  useEffect(() => {
-    if (!connected) return;
-    if (!user) return;
-    socket.emit('register', { id: userId.current, name: userName });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid, userName]);
-
-  return {
-    connected,
-    others,
-    myCoords: coords,
-    isGeolocationAvailable,
-    isGeolocationEnabled,
-    userName,
-  };
+  return { connected, others, myCoords: coords, userName };
 }
